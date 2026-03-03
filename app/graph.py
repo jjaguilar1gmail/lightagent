@@ -15,8 +15,12 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
-from .tools import calc, echo_json, now_utc
+from dotenv import load_dotenv
 
+from .tools import calc, echo_json, now_utc
+import os
+
+load_dotenv()
 
 # ----------------------------
 # 1) State definition
@@ -44,8 +48,7 @@ class AgentState(TypedDict, total=False):
 # TODO: Load your OpenRouter API key securely.
 # For example, from a .env file or environment variables.
 # import os
-# OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_API_KEY = "YOUR_OPENROUTER_API_KEY"  # <-- PASTE YOUR KEY HERE
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 TOOLS = [calc, now_utc, echo_json]
 
@@ -104,6 +107,7 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
             )
         ),
     ]
+    print(prompt)
     resp = ChatOpenAI(
         model="openai/gpt-oss-120b:free",
         temperature=0.2,
@@ -120,7 +124,7 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
             state["plan"] = [str(x) for x in plan][:8]
     except Exception:
         state["plan"] = ["Think step-by-step", "Use tools as needed", "Answer concisely"]
-
+    print(f"Planner produced plan: {state['plan']}")
     return state
 
 
@@ -137,9 +141,8 @@ def agent_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
         msgs.append(SystemMessage(content=f"Current plan:\n- " + "\n- ".join(state["plan"])))
 
     msgs.extend(state["messages"])
-
+    print(f"Agent invoking LLM with {len(msgs)} messages and step {state['step']}...")
     resp = llm.invoke(msgs, config=config)
-
     # If the model called tools, we route to tool execution next.
     return {"messages": [resp]}
 
@@ -208,7 +211,7 @@ def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
     # Use the last few messages as context
     tail = state["messages"][-8:]
     check_prompt.extend(tail)
-
+    print(f"Reflect node checking if done with {len(tail)} recent messages...")
     checker = ChatOpenAI(
         model="openai/gpt-oss-120b:free",
         temperature=0.0,
@@ -216,10 +219,11 @@ def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
         base_url="https://openrouter.ai/api/v1",
     )
     resp = checker.invoke(check_prompt, config=config)
-
+    
     import json
     try:
         obj = json.loads(resp.content)
+        print(f"Reflect node got response: {obj}")
         state["done"] = bool(obj.get("done", False))
     except Exception:
         # Default to not done unless we’re near budget
@@ -237,7 +241,9 @@ def route_after_agent(state: AgentState) -> Literal["tools", "reflect"]:
 
     last = state["messages"][-1]
     if isinstance(last, AIMessage) and getattr(last, "tool_calls", None):
+        print(f"Routing to tools execution. Tools: {getattr(last, 'tool_calls', None)}")
         return "tools"
+    print("Routing to reflect node.")
     return "reflect"
 
 
