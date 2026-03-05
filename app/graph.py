@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated, Any, Dict, List, Literal, Optional, TypedDict
+from typing import Annotated, Any, Dict, List, Literal, TypedDict
+
+from pydantic import BaseModel
 
 from langchain_core.messages import (
     AIMessage,
@@ -18,7 +20,7 @@ from langgraph.graph.message import add_messages
 
 from dotenv import load_dotenv
 
-from .tools import calc, echo_json, now_utc
+from .tools import calc, echo_json, final_answer, now_utc
 from .tracing import traced_node, traced_router, traced_tool
 import json
 import os
@@ -46,8 +48,6 @@ class AgentState(TypedDict, total=False):
     final_answer: str
     # Useful for traces/debugging why a run ended.
     termination_reason: str
-    # Bounded parser-failure counter for agent/reflect strict-JSON paths.
-    parse_errors: int
 
 
 # ----------------------------
@@ -58,17 +58,19 @@ class AgentState(TypedDict, total=False):
 # For example, from a .env file or environment variables.
 # import os
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-# Originals used for bind_tools (schema generation) — must stay as StructuredTool instances.
-TOOLS = [calc, now_utc, echo_json]
-# Wrapped versions used at execution time — emit tracing events around every call.
-TRACED_TOOLS = [traced_tool(t) for t in TOOLS]
+# Tools visible to the LLM for schema generation.
+# final_answer is included so the model knows to call it for terminal responses.
+TOOLS = [calc, now_utc, echo_json, final_answer]
+# Tools actually executed at runtime.
+# final_answer is intentionally excluded — agent_node intercepts it before tool_node.
+TRACED_TOOLS = [traced_tool(t) for t in [calc, now_utc, echo_json]]
 
 SYSTEM_PROMPT = """You are a helpful agent in a LangGraph demo.
 You MUST:
 - Be concise.
 - Use tools when helpful.
 - If you need math or current time, call a tool.
-- If no tool is needed, respond as JSON: {"done": true|false, "final_answer": string}.
+- When you have a complete answer ready, call the final_answer tool.
 """
 
 model_name = "meta-llama/llama-3.3-70b-instruct"#"openai/gpt-oss-120b:free"  # Or any other model on OpenRouter
@@ -91,83 +93,14 @@ def _ensure_defaults(state: AgentState) -> AgentState:
     state.setdefault("done", False)
     state.setdefault("final_answer", "")
     state.setdefault("termination_reason", "")
-    state.setdefault("parse_errors", 0)
     state.setdefault("scratch", {})
     state.setdefault("plan", [])
     return state
 
 
-def _parse_json_object(content: Any) -> Optional[Dict[str, Any]]:
-    # Best-effort parser for model output:
-    # 1) parse plain JSON object
-    # 2) parse fenced JSON block
-    # 3) parse first object-shaped substring
-    if isinstance(content, dict):
-        return content
-    if not isinstance(content, str):
-        return None
-
-    text = content.strip()
-    if not text:
-        return None
-
-    if text.startswith("```"):
-        text = text.strip("`")
-        if text.startswith("json"):
-            text = text[4:].strip()
-
-    # Try full parse first.
-    try:
-        obj = json.loads(text)
-        return obj if isinstance(obj, dict) else None
-    except Exception:
-        pass
-
-    # Fallback: first balanced-ish JSON object substring.
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        return None
-    try:
-        obj = json.loads(text[start : end + 1])
-        return obj if isinstance(obj, dict) else None
-    except Exception:
-        return None
-
-
-def _retry_agent_json(msgs: List[AnyMessage], config: RunnableConfig) -> Optional[Dict[str, Any]]:
-    # Single repair attempt that reuses full conversation context and asks for
-    # strict terminal JSON. This avoids brittle repairs based on empty strings.
-    repair_prompt = list(msgs)
-    repair_prompt.append(
-        SystemMessage(
-            content=(
-                "Previous output was invalid or empty. "
-                "Return ONLY valid JSON with keys: done (boolean), final_answer (string). "
-                "No markdown and no tool calls."
-            )
-        )
-    )
-    repair_model = ChatOpenAI(
-        model=model_name,
-        temperature=0.0,
-        api_key=OPENROUTER_API_KEY,
-        base_url="https://openrouter.ai/api/v1",
-    )
-    repaired = repair_model.invoke(repair_prompt, config=config)
-    return _parse_json_object(repaired.content)
-
-
-def _has_user_facing_answer(state: AgentState) -> bool:
-    # Guard against ending with only tool calls / empty content.
-    # A "real" answer is an AI message with non-empty text and no pending tool calls.
-    for msg in reversed(state.get("messages", [])):
-        if isinstance(msg, AIMessage):
-            content = str(getattr(msg, "content", "") or "").strip()
-            has_tool_calls = bool(getattr(msg, "tool_calls", None))
-            if content and not has_tool_calls:
-                return True
-    return False
+class _ReflectDecision(BaseModel):
+    # Structured output schema for the reflect node's binary done-check.
+    done: bool
 
 
 @traced_node
@@ -204,8 +137,7 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
         base_url="https://openrouter.ai/api/v1",
     ).invoke(prompt, config=config)
 
-    # Minimal robust parse (don’t overengineer starter)
-
+    # Minimal robust parse (don't overengineer starter)
     try:
         obj = json.loads(resp.content)
         plan = obj.get("plan", [])
@@ -216,6 +148,7 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
     return state
 
 
+
 @traced_node
 def agent_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     state = _ensure_defaults(state)
@@ -224,90 +157,46 @@ def agent_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
 
     # Deterministic hard stop to prevent unbounded loops.
     if current_step >= state["max_steps"]:
+        fallback = "I reached the step budget and could not complete the task."
         return {
             "step": current_step,
             "done": True,
             "termination_reason": "max_steps",
-            "messages": [AIMessage(content="I’m stopping because the step budget was reached.")],
+            "final_answer": fallback,
+            "messages": [AIMessage(content=fallback)],
         }
 
     msgs: List[AnyMessage] = []
     if not state["messages"] or not isinstance(state["messages"][0], SystemMessage):
         msgs.append(SystemMessage(content=SYSTEM_PROMPT))
 
-    # Add a lightweight “plan context” message so the agent acts consistently
+    # Add a lightweight "plan context" message so the agent acts consistently.
     if state.get("plan"):
-        msgs.append(SystemMessage(content=f"Current plan:\n- " + "\n- ".join(state["plan"])))
-
-    msgs.append(
-        SystemMessage(
-            content=(
-                "If you need a tool, call it. "
-                "If no tool is needed, respond ONLY as JSON with keys done (boolean) and final_answer (string)."
-            )
-        )
-    )
+        msgs.append(SystemMessage(content="Current plan:\n- " + "\n- ".join(state["plan"])))
 
     msgs.extend(state["messages"])
-    # show response in agent node for debugging
     resp = llm.invoke(msgs, config=config)
-    # Tool calls are executed first; terminal JSON is handled only on non-tool turns.
-    if getattr(resp, "tool_calls", None):
+
+    tool_calls = getattr(resp, "tool_calls", None) or []
+
+    # Intercept final_answer tool call: extract answer, mark terminal, never execute.
+    for call in tool_calls:
+        if call.get("name") == "final_answer":
+            answer = str((call.get("args") or {}).get("answer", "")).strip()
+            if answer:
+                return {
+                    "messages": [resp],
+                    "done": True,
+                    "step": current_step,
+                    "final_answer": answer,
+                    "termination_reason": "completed",
+                }
+
+    # Any other tool calls go to tool_node for execution.
+    if tool_calls:
         return {"messages": [resp], "done": False, "step": current_step}
 
-    parsed = _parse_json_object(resp.content)
-    # Retry once with strict instruction only when model emitted non-empty invalid text.
-    if parsed is None and str(resp.content or "").strip():
-        parsed = _retry_agent_json(msgs, config)
-
-    if parsed is None:
-        # Bounded parse-error budget: stop cleanly with a fallback answer.
-        parse_errors = int(state.get("parse_errors", 0)) + 1
-        updates: Dict[str, Any] = {
-            "messages": [resp],
-            "done": False,
-            "step": current_step,
-            "parse_errors": parse_errors,
-        }
-        if parse_errors >= 2:
-            updates["done"] = True
-            updates["termination_reason"] = "agent_parse_error_budget"
-            fallback = "I’m unable to format a reliable final response right now. Please try rephrasing your request."
-            updates["final_answer"] = fallback
-            updates["messages"] = [AIMessage(content=fallback)]
-        return updates
-
-    done = bool(parsed.get("done", False))
-    final_answer = str(parsed.get("final_answer", "")).strip()
-
-    # Valid terminal packet: convert to a normal AI message for downstream UX.
-    if done and final_answer:
-        return {
-            "messages": [AIMessage(content=final_answer)],
-            "done": True,
-            "step": current_step,
-            "final_answer": final_answer,
-            "termination_reason": "completed",
-            "parse_errors": 0,
-        }
-
-    if done and not final_answer:
-        # "done" without answer is treated as malformed terminal output.
-        parse_errors = int(state.get("parse_errors", 0)) + 1
-        updates = {
-            "messages": [resp],
-            "done": False,
-            "step": current_step,
-            "parse_errors": parse_errors,
-        }
-        if parse_errors >= 2:
-            updates["done"] = True
-            updates["termination_reason"] = "agent_done_without_answer"
-            fallback = "I reached a completion state but do not have a valid final answer to return."
-            updates["final_answer"] = fallback
-            updates["messages"] = [AIMessage(content=fallback)]
-        return updates
-
+    # No tool calls and no final_answer — send to reflect to decide next.
     return {"messages": [resp], "step": current_step, "done": False}
 
 
@@ -359,66 +248,48 @@ def tool_node(state: AgentState) -> Dict[str, Any]:
 @traced_node
 def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
     """
-    Optional: a cheap “are we done?” pass that sets done flag.
-    You can delete this node later if you want.
+    Binary "are we done?" check. done=True signals the agent to call final_answer next turn.
     """
     state = _ensure_defaults(state)
 
-    # Fast-path: once final answer exists, reflection should never reopen the loop.
+    # Fast-path: terminal state already set by agent_node.
     if state.get("done") or state.get("final_answer"):
         state["done"] = True
         if not state.get("termination_reason"):
             state["termination_reason"] = "completed"
         return state
 
-    # Hard stop if too many steps
+    # Hard stop if too many steps.
     if state["step"] >= state["max_steps"]:
         state["done"] = True
         state["termination_reason"] = "max_steps"
         return state
 
-    # Ask a strict binary checker whether we can finish now.
+    # Structured-output binary check: reliable, no text parsing needed.
     check_prompt = [
         SystemMessage(
             content=(
-                "Return ONLY JSON with a single key: done (boolean). "
-                "No markdown, no prose, no tool calls."
+                "Does the conversation below contain enough information to give a complete final answer? "
+                "Respond with done=true or done=false."
             )
         ),
     ]
-    # Use the last few messages as context
-    tail = state["messages"][-8:]
-    check_prompt.extend(tail)
+    # Use the last few messages as context.
+    check_prompt.extend(state["messages"][-8:])
 
     checker = ChatOpenAI(
         model=model_name,
         temperature=0.0,
         api_key=OPENROUTER_API_KEY,
         base_url="https://openrouter.ai/api/v1",
-    )
-    resp = checker.invoke(check_prompt, config=config)
-    obj = _parse_json_object(resp.content)
-    if obj is None:
-        # One bounded retry for invalid checker output.
-        retry_prompt = list(check_prompt)
-        retry_prompt.append(SystemMessage(content="Previous output was invalid. Output strict JSON only."))
-        retry = checker.invoke(retry_prompt, config=config)
-        obj = _parse_json_object(retry.content)
+    ).with_structured_output(_ReflectDecision)
 
-    if obj is not None and "done" in obj:
-        proposed_done = bool(obj.get("done", False))
-        # Never allow reflect to terminate unless there's an actual user-facing answer.
-        if proposed_done and not (state.get("final_answer") or _has_user_facing_answer(state)):
-            state["done"] = False
-        else:
-            state["done"] = proposed_done
-    else:
-        state["parse_errors"] = int(state.get("parse_errors", 0)) + 1
-        if state["parse_errors"] >= 2:
-            state["done"] = True
-            state["termination_reason"] = "reflect_parse_error_budget"
-        else:
-            state["done"] = False
+    try:
+        result = checker.invoke(check_prompt, config=config)
+        state["done"] = result.done
+    except Exception:
+        # If structured output fails, keep going rather than crashing.
+        state["done"] = False
 
     return state
 

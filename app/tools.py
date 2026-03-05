@@ -44,3 +44,14 @@ def now_utc() -> str:
 def echo_json(obj: Dict[str, Any]) -> str:
     """Echo back structured JSON (useful to test tool calling)."""
     return json.dumps(obj, indent=2, sort_keys=True)
+
+
+@tool
+def final_answer(answer: str) -> str:
+    """
+    Signal that you have a complete answer for the user.
+    Call this — instead of replying in plain text — when you are ready to respond.
+    The 'answer' argument should be a clear, complete response to the user's question.
+    """
+    # Never executed: agent_node intercepts this call before tool_node runs.
+    return answer

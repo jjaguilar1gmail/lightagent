@@ -12,8 +12,9 @@ These updates address the functional issues identified in the `3395f7b1faed` tra
 
 2. **Enforce structured outputs for decision nodes**
    - **Status: Completed**
-   - Require strict JSON schema (or equivalent structured output) for both `agent_node` and `reflect_node`.
-   - Treat empty/non-JSON outputs as controlled parse errors with bounded retry behavior.
+   - `agent_node` now uses the `final_answer` tool-call mechanism (no text parsing required).
+   - `reflect_node` uses `with_structured_output(_ReflectDecision)` for a reliable binary done-check.
+   - All JSON-parsing helpers (`_parse_json_object`, `_retry_agent_json`, `_has_user_facing_answer`) removed.
 
 3. **Fix routing precedence to prevent loops**
    - **Status: Completed**
@@ -21,11 +22,10 @@ These updates address the functional issues identified in the `3395f7b1faed` tra
    - Prevent accidental tool-call formatting from re-entering the tool loop after a complete answer is available.
 
 4. **Unify completion ownership**
-   - **Status: Not started**
-   - Choose one owner for termination logic:
-     - Option A: `agent` sets completion and `reflect` is removed.
-     - Option B: `reflect` sets completion and `agent` prompt no longer says to set `done=true`.
-   - Remove mixed responsibility between agent prompt and reflect node.
+   - **Status: Completed**
+   - Chose Option A variant: `agent_node` intercepts the `final_answer` tool call and sets `done=True` + `final_answer` + `termination_reason`.
+   - `reflect_node` is a lightweight binary check only (no termination authority on its own).
+   - `final_answer` is in `TOOLS` (schema) but excluded from `TRACED_TOOLS` (execution); termination is handled entirely in `agent_node`.
 
 5. **Add no-progress and repetition safeguards**
    - **Status: Not started**
@@ -50,9 +50,10 @@ These updates address the functional issues identified in the `3395f7b1faed` tra
    - Prevent `echo_json` from being treated as a reasoning step that can recursively trigger additional tool usage.
 
 9. **Improve termination observability**
-   - **Status: Partial**
-   - Emit explicit termination metadata in trace events (for example: `completed`, `max_steps`, `no_progress`, `parse_error_budget`).
-   - Make `run_end` include the final termination reason for fast diagnostics.
+   - **Status: Completed**
+   - `termination_reason` field is set on every exit path: `completed`, `max_steps`.
+   - `node_end` trace events now include `termination_reason` and `final_answer` in the post-execution state snapshot.
+   - `run_end` inherits these from the final state (tracked by `TraceEmitter._state`).
 
 ## Suggested Rollout Order
 1. Graph termination contract (`done` state + routing precedence + ownership).

@@ -43,13 +43,18 @@ def main():
     with new_run(sinks=sinks) as run:
         final = graph.invoke(init_state)
 
-    # Print final assistant message
-    msgs = final["messages"]
-    for m in reversed(msgs):
-        if getattr(m, "type", "") == "ai":
-            print("\n---\n")
-            print(m.content)
-            break
+    # Prefer the structured state field; fall back to scanning messages.
+    final_answer_text = final.get("final_answer", "")
+    if final_answer_text:
+        print("\n---\n")
+        print(final_answer_text)
+    else:
+        msgs = final["messages"]
+        for m in reversed(msgs):
+            if getattr(m, "type", "") == "ai" and getattr(m, "content", ""):
+                print("\n---\n")
+                print(m.content)
+                break
 
     print(f"\n[trace written to traces/{run.run_id}.jsonl and traces/traces.db]")
 
