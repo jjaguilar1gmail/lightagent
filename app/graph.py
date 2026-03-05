@@ -18,6 +18,8 @@ from langgraph.graph.message import add_messages
 from dotenv import load_dotenv
 
 from .tools import calc, echo_json, now_utc
+from .tracing import traced_node, traced_router, traced_tool
+import json
 import os
 
 load_dotenv()
@@ -49,7 +51,10 @@ class AgentState(TypedDict, total=False):
 # For example, from a .env file or environment variables.
 # import os
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+# Originals used for bind_tools (schema generation) — must stay as StructuredTool instances.
 TOOLS = [calc, now_utc, echo_json]
+# Wrapped versions used at execution time — emit tracing events around every call.
+TRACED_TOOLS = [traced_tool(t) for t in TOOLS]
 
 SYSTEM_PROMPT = """You are a helpful agent in a LangGraph demo.
 You MUST:
@@ -81,6 +86,7 @@ def _ensure_defaults(state: AgentState) -> AgentState:
     return state
 
 
+@traced_node
 def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
     state = _ensure_defaults(state)
 
@@ -107,7 +113,6 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
             )
         ),
     ]
-    print("Planner node invoking LLM to create a plan for the user's goal...")
     resp = ChatOpenAI(
         model=model_name,
         temperature=0.2,
@@ -116,7 +121,7 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
     ).invoke(prompt, config=config)
 
     # Minimal robust parse (don’t overengineer starter)
-    import json
+
     try:
         obj = json.loads(resp.content)
         plan = obj.get("plan", [])
@@ -124,12 +129,10 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
             state["plan"] = [str(x) for x in plan][:8]
     except Exception:
         state["plan"] = ["Think step-by-step", "Use tools as needed", "Answer concisely"]
-    print(f"Planner produced plan:")
-    for i, step in enumerate(state["plan"], 1):
-        print(f"{i}. {step}")   
     return state
 
 
+@traced_node
 def agent_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     state = _ensure_defaults(state)
     state["step"] += 1
@@ -145,11 +148,11 @@ def agent_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     msgs.extend(state["messages"])
     # show response in agent node for debugging
     resp = llm.invoke(msgs, config=config)
-    print(f"Agent node got response: {resp.content}")
     # If the model called tools, we route to tool execution next.
     return {"messages": [resp]}
 
 
+@traced_node(name="tools")
 def tool_node(state: AgentState) -> Dict[str, Any]:
     """
     Execute any pending tool calls from the last AI message and return ToolMessages.
@@ -161,12 +164,11 @@ def tool_node(state: AgentState) -> Dict[str, Any]:
         return {"messages": []}
 
     tool_messages: List[ToolMessage] = []
-    tool_map = {t.name: t for t in TOOLS}
+    tool_map = {t.name: t for t in TRACED_TOOLS}
 
     for call in getattr(last, "tool_calls", []) or []:
         name = call.get("name")
         args = call.get("args") or {}
-        print(f"Executing tool call: {name} with args {args}")
         tool = tool_map.get(name)
         if tool is None:
             tool_messages.append(
@@ -195,7 +197,7 @@ def tool_node(state: AgentState) -> Dict[str, Any]:
 
     return {"messages": tool_messages}
 
-
+@traced_node
 def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
     """
     Optional: a cheap “are we done?” pass that sets done flag.
@@ -212,7 +214,6 @@ def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
     check_prompt = [
         SystemMessage(content="Return JSON: {\"done\": true|false}. done=true if a final answer can be given now."),
     ]
-    print("Reflecting on current state to check if we can finish...")
     # Use the last few messages as context
     tail = state["messages"][-8:]
     check_prompt.extend(tail)
@@ -224,16 +225,12 @@ def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
         base_url="https://openrouter.ai/api/v1",
     )
     resp = checker.invoke(check_prompt, config=config)
-    
-    import json
     try:
         obj = json.loads(resp.content)
-        print(f"Reflect node got response: {obj}")
         state["done"] = bool(obj.get("done", False))
     except Exception:
-        # Default to not done unless we’re near budget
+        # Default to not done unless we're near budget
         state["done"] = state["step"] >= state["max_steps"] - 1
-        print(f"Reflect node failed to parse JSON. Defaulting done={state['done']}. Response was: {resp.content}")
 
     return state
 
@@ -242,17 +239,17 @@ def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
 # 4) Routing
 # ----------------------------
 
+@traced_router
 def route_after_agent(state: AgentState) -> Literal["tools", "reflect"]:
     from langchain_core.messages import AIMessage
 
     last = state["messages"][-1]
     if isinstance(last, AIMessage) and getattr(last, "tool_calls", None):
-        print(f"Routing to tools execution. Tools: {getattr(last, 'tool_calls', None)}")
         return "tools"
-    print("Routing to reflect node.")
     return "reflect"
 
 
+@traced_router
 def route_after_reflect(state: AgentState) -> Literal["agent", "end"]:
     return "end" if state.get("done") else "agent"
 

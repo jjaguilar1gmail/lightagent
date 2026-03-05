@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import os
+import sys
 from dotenv import load_dotenv
 
 from langchain_core.messages import HumanMessage
 from .graph import build_graph
+from .tracing import new_run, ConsoleSink, JSONLSink, SQLiteSink
 
 
 def main():
@@ -12,9 +14,15 @@ def main():
     if not os.getenv("OPENROUTER_API_KEY"):
         raise SystemExit("Missing OPENROUTER_API_KEY (set it in env or .env).")
 
+    debug = "--debug" in sys.argv
+    pretty = not debug
+
     graph = build_graph()
 
-    print("LangGraph Starter CLI. Type your prompt and press Enter.\n")
+    print("LangGraph Starter CLI. Type your prompt and press Enter.")
+    if debug:
+        print("[debug mode: raw JSON event stream]")
+    print()
     user = input("> ").strip()
 
     init_state = {
@@ -22,16 +30,25 @@ def main():
         "max_steps": 8,
     }
 
-    final = graph.invoke(init_state)
+    jsonl = JSONLSink(directory="traces")
+    sinks = [
+        ConsoleSink(pretty=pretty),
+        jsonl,
+        SQLiteSink(path="traces/traces.db"),
+    ]
 
-    # Print final assistant message(s)
-    # The last message is usually the final AI message, but tools might be at the end—so search backwards.
+    with new_run(sinks=sinks) as run:
+        final = graph.invoke(init_state)
+
+    # Print final assistant message
     msgs = final["messages"]
     for m in reversed(msgs):
         if getattr(m, "type", "") == "ai":
             print("\n---\n")
             print(m.content)
             break
+
+    print(f"\n[trace written to traces/{run.run_id}.jsonl and traces/traces.db]")
 
 
 if __name__ == "__main__":
