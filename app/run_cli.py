@@ -15,6 +15,7 @@ def main():
         raise SystemExit("Missing OPENROUTER_API_KEY (set it in env or .env).")
 
     debug = "--debug" in sys.argv
+    llm_verbose = "--llm-verbose" in sys.argv
     pretty = not debug
 
     graph = build_graph()
@@ -22,6 +23,8 @@ def main():
     print("LangGraph Starter CLI. Type your prompt and press Enter.")
     if debug:
         print("[debug mode: raw JSON event stream]")
+    elif llm_verbose:
+        print("[llm-verbose mode: full LLM responses shown]")
     print()
     user = input("> ").strip()
 
@@ -32,7 +35,7 @@ def main():
 
     jsonl = JSONLSink(directory="traces")
     sinks = [
-        ConsoleSink(pretty=pretty),
+        ConsoleSink(pretty=pretty, llm_verbose=llm_verbose),
         jsonl,
         SQLiteSink(path="traces/traces.db"),
     ]

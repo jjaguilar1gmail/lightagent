@@ -124,32 +124,63 @@ class ConsoleSink:
     """
     Pretty (default) or debug console sink.
 
-    ``pretty=True``  — narrative summaries with colour via Rich (or plain fallback).
-    ``pretty=False`` — raw JSON dump of every event; use for ``--debug`` mode.
+    ``pretty=True``       — narrative summaries with colour via Rich (or plain fallback).
+    ``pretty=False``      — raw JSON dump of every event; use for ``--debug`` mode.
+    ``llm_verbose=True``  — pretty mode + full LLM responses printed after each agent turn.
     """
 
-    def __init__(self, pretty: bool = True):
+    def __init__(self, pretty: bool = True, llm_verbose: bool = False):
         self.pretty = pretty
+        self.llm_verbose = llm_verbose
         self._console = None
-        if pretty:
+        if pretty or llm_verbose:
             try:
                 from rich.console import Console  # type: ignore
                 self._console = Console(highlight=False)
             except ImportError:
                 pass  # graceful degradation to plain print
 
+    def _print(self, text: str) -> None:
+        if self._console:
+            self._console.print(text)
+        else:
+            print(_RICH_MARKUP.sub("", text))
+
     def handle(self, event: TraceEvent) -> None:
-        if not self.pretty:
+        if not self.pretty and not self.llm_verbose:
             print(json.dumps(event.to_dict(), default=str))
+            return
+
+        # ── llm-verbose additions ──────────────────────────────────────────
+        if self.llm_verbose:
+            t = event.type
+            p = event.payload
+            n = event.node or "llm"
+
+            if t == "llm_call_start":
+                model = p.get("model", "?")
+                self._print(f"\n[bold blue]┌─ LLM call[/bold blue]  [dim]{n} · {model}[/dim]")
+                return
+
+            if t == "llm_call_end":
+                response = (p.get("response") or "").strip()
+                elapsed = p.get("elapsed_ms")
+                ms = f" [dim]{elapsed}ms[/dim]" if elapsed else ""
+                err = p.get("error")
+                if err:
+                    self._print(f"[bold red]└─ LLM error:{ms} {str(err)[:200]}[/bold red]")
+                elif response:
+                    self._print(f"[blue]│[/blue]  {response}")
+                    self._print(f"[bold blue]└─ done[/bold blue]{ms}")
+                else:
+                    self._print(f"[bold blue]└─ done[/bold blue]{ms}  [dim](tool call — no text)[/dim]")
+                return
+
+        # ── normal pretty narrative ────────────────────────────────────────
+        if not self.pretty:
             return
 
         text = _narrative(event)
         if text is None:
             return
-
-        if self._console:
-            self._console.print(text)
-        else:
-            # Strip Rich markup and fall back to plain print
-            plain = _RICH_MARKUP.sub("", text)
-            print(plain)
+        self._print(text)

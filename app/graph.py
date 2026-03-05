@@ -64,7 +64,7 @@ You MUST:
 - If you have enough info, set done=true in your final response.
 """
 
-model_name = "meta-llama/llama-3.3-70b-instruct:free"#"openai/gpt-oss-120b:free"  # Or any other model on OpenRouter
+model_name = "meta-llama/llama-3.3-70b-instruct"#"openai/gpt-oss-120b:free"  # Or any other model on OpenRouter
 llm = ChatOpenAI(
     model=model_name,  # Or any other model on OpenRouter
     temperature=0.2,
