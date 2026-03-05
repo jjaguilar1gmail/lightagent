@@ -11,6 +11,23 @@ from .emitter import emit
 from .callbacks import TracingCallbackHandler
 
 
+def _state_snapshot(state: Any, result: Any = None) -> dict[str, Any]:
+    base = dict(state or {}) if isinstance(state, dict) else {}
+    if isinstance(result, dict):
+        base.update(result)
+    plan = base.get("plan", [])
+    return {
+        "step": base.get("step"),
+        "done": base.get("done"),
+        "final_answer": (base.get("final_answer") or "")[:160],
+        "termination_reason": (base.get("termination_reason") or "")[:120],
+        "parse_errors": base.get("parse_errors"),
+        "plan": plan,
+        "plan_len": len(plan),
+        "user_goal": (base.get("user_goal") or "")[:120],
+    }
+
+
 def traced_node(fn: Optional[Callable] = None, *, name: Optional[str] = None):
     """
     Decorator for LangGraph node functions.
@@ -48,28 +65,24 @@ def traced_node(fn: Optional[Callable] = None, *, name: Optional[str] = None):
                 existing.append(handler)
                 config = {**config, "callbacks": existing}
 
-        # --- build a concise snapshot of relevant state fields ---
-        payload = {
-            "step": state.get("step"),
-            "done": state.get("done"),
-            "plan": state.get("plan", []),
-            "plan_len": len(state.get("plan", [])),
-            "user_goal": (state.get("user_goal") or "")[:120],
-        }
+        # --- build concise snapshots of relevant state fields ---
+        start_payload = _state_snapshot(state)
 
-        emit("node_start", node=node_name, payload=payload)
+        emit("node_start", node=node_name, payload=start_payload)
         start = time.monotonic()
         try:
             result = fn(state, config) if _has_config else fn(state)
             elapsed = int((time.monotonic() - start) * 1000)
-            emit("node_end", node=node_name, payload={**payload, "elapsed_ms": elapsed})
+            end_payload = _state_snapshot(state, result=result)
+            emit("node_end", node=node_name, payload={**end_payload, "elapsed_ms": elapsed})
             return result
         except Exception as exc:
             elapsed = int((time.monotonic() - start) * 1000)
+            error_payload = _state_snapshot(state)
             emit(
                 "node_error",
                 node=node_name,
-                payload={**payload, "elapsed_ms": elapsed, "error": str(exc)},
+                payload={**error_payload, "elapsed_ms": elapsed, "error": str(exc)},
             )
             raise
 
