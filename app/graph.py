@@ -49,7 +49,6 @@ class AgentState(TypedDict, total=False):
 # For example, from a .env file or environment variables.
 # import os
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
 TOOLS = [calc, now_utc, echo_json]
 
 SYSTEM_PROMPT = """You are a helpful agent in a LangGraph demo.
@@ -60,8 +59,9 @@ You MUST:
 - If you have enough info, set done=true in your final response.
 """
 
+model_name = "meta-llama/llama-3.3-70b-instruct:free"#"openai/gpt-oss-120b:free"  # Or any other model on OpenRouter
 llm = ChatOpenAI(
-    model="openai/gpt-oss-120b:free",  # Or any other model on OpenRouter
+    model=model_name,  # Or any other model on OpenRouter
     temperature=0.2,
     api_key=OPENROUTER_API_KEY,
     base_url="https://openrouter.ai/api/v1",
@@ -107,9 +107,9 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
             )
         ),
     ]
-    print(prompt)
+    print("Planner node invoking LLM to create a plan for the user's goal...")
     resp = ChatOpenAI(
-        model="openai/gpt-oss-120b:free",
+        model=model_name,
         temperature=0.2,
         api_key=OPENROUTER_API_KEY,
         base_url="https://openrouter.ai/api/v1",
@@ -124,7 +124,9 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
             state["plan"] = [str(x) for x in plan][:8]
     except Exception:
         state["plan"] = ["Think step-by-step", "Use tools as needed", "Answer concisely"]
-    print(f"Planner produced plan: {state['plan']}")
+    print(f"Planner produced plan:")
+    for i, step in enumerate(state["plan"], 1):
+        print(f"{i}. {step}")   
     return state
 
 
@@ -141,8 +143,9 @@ def agent_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
         msgs.append(SystemMessage(content=f"Current plan:\n- " + "\n- ".join(state["plan"])))
 
     msgs.extend(state["messages"])
-    print(f"Agent invoking LLM with {len(msgs)} messages and step {state['step']}...")
+    # show response in agent node for debugging
     resp = llm.invoke(msgs, config=config)
+    print(f"Agent node got response: {resp.content}")
     # If the model called tools, we route to tool execution next.
     return {"messages": [resp]}
 
@@ -163,6 +166,7 @@ def tool_node(state: AgentState) -> Dict[str, Any]:
     for call in getattr(last, "tool_calls", []) or []:
         name = call.get("name")
         args = call.get("args") or {}
+        print(f"Executing tool call: {name} with args {args}")
         tool = tool_map.get(name)
         if tool is None:
             tool_messages.append(
@@ -208,12 +212,13 @@ def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
     check_prompt = [
         SystemMessage(content="Return JSON: {\"done\": true|false}. done=true if a final answer can be given now."),
     ]
+    print("Reflecting on current state to check if we can finish...")
     # Use the last few messages as context
     tail = state["messages"][-8:]
     check_prompt.extend(tail)
-    print(f"Reflect node checking if done with {len(tail)} recent messages...")
+
     checker = ChatOpenAI(
-        model="openai/gpt-oss-120b:free",
+        model=model_name,
         temperature=0.0,
         api_key=OPENROUTER_API_KEY,
         base_url="https://openrouter.ai/api/v1",
@@ -228,6 +233,7 @@ def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
     except Exception:
         # Default to not done unless we’re near budget
         state["done"] = state["step"] >= state["max_steps"] - 1
+        print(f"Reflect node failed to parse JSON. Defaulting done={state['done']}. Response was: {resp.content}")
 
     return state
 
