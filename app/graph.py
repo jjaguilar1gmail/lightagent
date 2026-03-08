@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated, Any, Dict, List, Literal, Optional, TypedDict
+from typing import Annotated, Any, Dict, List, Literal, TypedDict
+
+from pydantic import BaseModel
 
 from langchain_core.messages import (
+    AIMessage,
     AnyMessage,
     HumanMessage,
     SystemMessage,
@@ -17,7 +20,9 @@ from langgraph.graph.message import add_messages
 
 from dotenv import load_dotenv
 
-from .tools import calc, echo_json, now_utc
+from .tools import calc, final_answer, now_utc
+from .tracing import traced_node, traced_router, traced_tool
+import json
 import os
 
 load_dotenv()
@@ -39,6 +44,10 @@ class AgentState(TypedDict, total=False):
     step: int
     max_steps: int
     done: bool
+    # Non-empty only when we have a user-safe terminal answer.
+    final_answer: str
+    # Useful for traces/debugging why a run ended.
+    termination_reason: str
 
 
 # ----------------------------
@@ -49,17 +58,22 @@ class AgentState(TypedDict, total=False):
 # For example, from a .env file or environment variables.
 # import os
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-TOOLS = [calc, now_utc, echo_json]
+# Tools visible to the LLM for schema generation.
+# final_answer is included so the model knows to call it for terminal responses.
+TOOLS = [calc, now_utc, final_answer]
+# Tools actually executed at runtime.
+# final_answer is intentionally excluded — agent_node intercepts it before tool_node.
+TRACED_TOOLS = [traced_tool(t) for t in [calc, now_utc]]
 
 SYSTEM_PROMPT = """You are a helpful agent in a LangGraph demo.
 You MUST:
 - Be concise.
 - Use tools when helpful.
 - If you need math or current time, call a tool.
-- If you have enough info, set done=true in your final response.
+- When you have a complete answer ready, call the final_answer tool.
 """
 
-model_name = "meta-llama/llama-3.3-70b-instruct:free"#"openai/gpt-oss-120b:free"  # Or any other model on OpenRouter
+model_name = "meta-llama/llama-3.3-70b-instruct"#"openai/gpt-oss-120b:free"  # Or any other model on OpenRouter
 llm = ChatOpenAI(
     model=model_name,  # Or any other model on OpenRouter
     temperature=0.2,
@@ -73,14 +87,23 @@ llm = ChatOpenAI(
 # ----------------------------
 
 def _ensure_defaults(state: AgentState) -> AgentState:
+    # Keep state initialization centralized so every node sees the same defaults.
     state.setdefault("step", 0)
     state.setdefault("max_steps", 8)
     state.setdefault("done", False)
+    state.setdefault("final_answer", "")
+    state.setdefault("termination_reason", "")
     state.setdefault("scratch", {})
     state.setdefault("plan", [])
     return state
 
 
+class _ReflectDecision(BaseModel):
+    # Structured output schema for the reflect node's binary done-check.
+    done: bool
+
+
+@traced_node
 def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
     state = _ensure_defaults(state)
 
@@ -107,7 +130,6 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
             )
         ),
     ]
-    print("Planner node invoking LLM to create a plan for the user's goal...")
     resp = ChatOpenAI(
         model=model_name,
         temperature=0.2,
@@ -115,8 +137,7 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
         base_url="https://openrouter.ai/api/v1",
     ).invoke(prompt, config=config)
 
-    # Minimal robust parse (don’t overengineer starter)
-    import json
+    # Minimal robust parse (don't overengineer starter)
     try:
         obj = json.loads(resp.content)
         plan = obj.get("plan", [])
@@ -124,32 +145,85 @@ def planner_node(state: AgentState, config: RunnableConfig) -> AgentState:
             state["plan"] = [str(x) for x in plan][:8]
     except Exception:
         state["plan"] = ["Think step-by-step", "Use tools as needed", "Answer concisely"]
-    print(f"Planner produced plan:")
-    for i, step in enumerate(state["plan"], 1):
-        print(f"{i}. {step}")   
     return state
 
 
+
+@traced_node
 def agent_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     state = _ensure_defaults(state)
-    state["step"] += 1
+    # Step is persisted through returned state updates (not in-place mutation).
+    current_step = int(state.get("step", 0)) + 1
+
+    # Deterministic hard stop to prevent unbounded loops.
+    if current_step >= state["max_steps"]:
+        fallback = "I reached the step budget and could not complete the task."
+        return {
+            "step": current_step,
+            "done": True,
+            "termination_reason": "max_steps",
+            "final_answer": fallback,
+            "messages": [AIMessage(content=fallback)],
+        }
 
     msgs: List[AnyMessage] = []
     if not state["messages"] or not isinstance(state["messages"][0], SystemMessage):
         msgs.append(SystemMessage(content=SYSTEM_PROMPT))
 
-    # Add a lightweight “plan context” message so the agent acts consistently
+    # Add a lightweight "plan context" message so the agent acts consistently.
     if state.get("plan"):
-        msgs.append(SystemMessage(content=f"Current plan:\n- " + "\n- ".join(state["plan"])))
+        msgs.append(SystemMessage(content="Current plan:\n- " + "\n- ".join(state["plan"])))
 
     msgs.extend(state["messages"])
-    # show response in agent node for debugging
     resp = llm.invoke(msgs, config=config)
-    print(f"Agent node got response: {resp.content}")
-    # If the model called tools, we route to tool execution next.
-    return {"messages": [resp]}
+
+    tool_calls = getattr(resp, "tool_calls", None) or []
+
+    # Intercept final_answer tool call: extract answer, mark terminal, never execute.
+    for call in tool_calls:
+        if call.get("name") == "final_answer":
+            answer = str((call.get("args") or {}).get("answer", "")).strip()
+            if answer:
+                return {
+                    "messages": [resp],
+                    "done": True,
+                    "step": current_step,
+                    "final_answer": answer,
+                    "termination_reason": "completed",
+                }
+
+    # Repeated-tool-call guard: if every proposed call duplicates a prior call
+    # (same tool name + identical args), we're stuck in a loop — terminate early.
+    if tool_calls:
+        seen = {
+            (c.get("name"), json.dumps(c.get("args") or {}, sort_keys=True))
+            for msg in state["messages"]
+            if isinstance(msg, AIMessage)
+            for c in (getattr(msg, "tool_calls", None) or [])
+        }
+        novel = [
+            c for c in tool_calls
+            if (c.get("name"), json.dumps(c.get("args") or {}, sort_keys=True)) not in seen
+        ]
+        if not novel:
+            fallback = "I appear to be stuck repeating the same tool calls. Stopping to avoid a loop."
+            return {
+                "messages": [resp],
+                "done": True,
+                "step": current_step,
+                "termination_reason": "repeated_tool_call",
+                "final_answer": fallback,
+            }
+
+    # Any other tool calls go to tool_node for execution.
+    if tool_calls:
+        return {"messages": [resp], "done": False, "step": current_step}
+
+    # No tool calls and no final_answer — send to reflect to decide next.
+    return {"messages": [resp], "step": current_step, "done": False}
 
 
+@traced_node(name="tools")
 def tool_node(state: AgentState) -> Dict[str, Any]:
     """
     Execute any pending tool calls from the last AI message and return ToolMessages.
@@ -161,12 +235,11 @@ def tool_node(state: AgentState) -> Dict[str, Any]:
         return {"messages": []}
 
     tool_messages: List[ToolMessage] = []
-    tool_map = {t.name: t for t in TOOLS}
+    tool_map = {t.name: t for t in TRACED_TOOLS}
 
     for call in getattr(last, "tool_calls", []) or []:
         name = call.get("name")
         args = call.get("args") or {}
-        print(f"Executing tool call: {name} with args {args}")
         tool = tool_map.get(name)
         if tool is None:
             tool_messages.append(
@@ -195,45 +268,51 @@ def tool_node(state: AgentState) -> Dict[str, Any]:
 
     return {"messages": tool_messages}
 
-
+@traced_node
 def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
     """
-    Optional: a cheap “are we done?” pass that sets done flag.
-    You can delete this node later if you want.
+    Binary "are we done?" check. done=True signals the agent to call final_answer next turn.
     """
     state = _ensure_defaults(state)
 
-    # Hard stop if too many steps
-    if state["step"] >= state["max_steps"]:
+    # Fast-path: terminal state already set by agent_node.
+    if state.get("done") or state.get("final_answer"):
         state["done"] = True
+        if not state.get("termination_reason"):
+            state["termination_reason"] = "completed"
         return state
 
-    # Ask a small model: do we have enough to answer?
+    # Hard stop if too many steps.
+    if state["step"] >= state["max_steps"]:
+        state["done"] = True
+        state["termination_reason"] = "max_steps"
+        return state
+
+    # Structured-output binary check: reliable, no text parsing needed.
     check_prompt = [
-        SystemMessage(content="Return JSON: {\"done\": true|false}. done=true if a final answer can be given now."),
+        SystemMessage(
+            content=(
+                "Does the conversation below contain enough information to give a complete final answer? "
+                "Respond with done=true or done=false."
+            )
+        ),
     ]
-    print("Reflecting on current state to check if we can finish...")
-    # Use the last few messages as context
-    tail = state["messages"][-8:]
-    check_prompt.extend(tail)
+    # Use the last few messages as context.
+    check_prompt.extend(state["messages"][-8:])
 
     checker = ChatOpenAI(
         model=model_name,
         temperature=0.0,
         api_key=OPENROUTER_API_KEY,
         base_url="https://openrouter.ai/api/v1",
-    )
-    resp = checker.invoke(check_prompt, config=config)
-    
-    import json
+    ).with_structured_output(_ReflectDecision)
+
     try:
-        obj = json.loads(resp.content)
-        print(f"Reflect node got response: {obj}")
-        state["done"] = bool(obj.get("done", False))
+        result = checker.invoke(check_prompt, config=config)
+        state["done"] = result.done
     except Exception:
-        # Default to not done unless we’re near budget
-        state["done"] = state["step"] >= state["max_steps"] - 1
-        print(f"Reflect node failed to parse JSON. Defaulting done={state['done']}. Response was: {resp.content}")
+        # If structured output fails, keep going rather than crashing.
+        state["done"] = False
 
     return state
 
@@ -242,19 +321,24 @@ def reflect_node(state: AgentState, config: RunnableConfig) -> AgentState:
 # 4) Routing
 # ----------------------------
 
-def route_after_agent(state: AgentState) -> Literal["tools", "reflect"]:
+@traced_router
+def route_after_agent(state: AgentState) -> Literal["tools", "reflect", "end"]:
     from langchain_core.messages import AIMessage
+
+    # Termination state always wins over tool routing.
+    if state.get("done") or state.get("final_answer"):
+        return "end"
 
     last = state["messages"][-1]
     if isinstance(last, AIMessage) and getattr(last, "tool_calls", None):
-        print(f"Routing to tools execution. Tools: {getattr(last, 'tool_calls', None)}")
         return "tools"
-    print("Routing to reflect node.")
     return "reflect"
 
 
+@traced_router
 def route_after_reflect(state: AgentState) -> Literal["agent", "end"]:
-    return "end" if state.get("done") else "agent"
+    # Reflect can only end when terminal state has been materialized.
+    return "end" if state.get("done") or state.get("final_answer") else "agent"
 
 
 # ----------------------------
@@ -271,7 +355,7 @@ def build_graph():
     g.set_entry_point("planner")
     g.add_edge("planner", "agent")
 
-    g.add_conditional_edges("agent", route_after_agent, {"tools": "tools", "reflect": "reflect"})
+    g.add_conditional_edges("agent", route_after_agent, {"tools": "tools", "reflect": "reflect", "end": END})
     g.add_edge("tools", "agent")
     g.add_conditional_edges("reflect", route_after_reflect, {"agent": "agent", "end": END})
 
