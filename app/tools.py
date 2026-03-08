@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import json
 import math
 from datetime import datetime, timezone
-from typing import Any, Dict
 
 from langchain_core.tools import tool
 
@@ -38,12 +36,6 @@ def calc(expression: str) -> str:
 def now_utc() -> str:
     """Return the current UTC time as ISO string."""
     return datetime.now(timezone.utc).isoformat()
-
-
-@tool
-def echo_json(obj: Dict[str, Any]) -> str:
-    """Echo back structured JSON (useful to test tool calling)."""
-    return json.dumps(obj, indent=2, sort_keys=True)
 
 
 @tool

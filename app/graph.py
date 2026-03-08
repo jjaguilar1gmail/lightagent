@@ -20,7 +20,7 @@ from langgraph.graph.message import add_messages
 
 from dotenv import load_dotenv
 
-from .tools import calc, echo_json, final_answer, now_utc
+from .tools import calc, final_answer, now_utc
 from .tracing import traced_node, traced_router, traced_tool
 import json
 import os
@@ -60,10 +60,10 @@ class AgentState(TypedDict, total=False):
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 # Tools visible to the LLM for schema generation.
 # final_answer is included so the model knows to call it for terminal responses.
-TOOLS = [calc, now_utc, echo_json, final_answer]
+TOOLS = [calc, now_utc, final_answer]
 # Tools actually executed at runtime.
 # final_answer is intentionally excluded — agent_node intercepts it before tool_node.
-TRACED_TOOLS = [traced_tool(t) for t in [calc, now_utc, echo_json]]
+TRACED_TOOLS = [traced_tool(t) for t in [calc, now_utc]]
 
 SYSTEM_PROMPT = """You are a helpful agent in a LangGraph demo.
 You MUST:
@@ -191,6 +191,29 @@ def agent_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
                     "final_answer": answer,
                     "termination_reason": "completed",
                 }
+
+    # Repeated-tool-call guard: if every proposed call duplicates a prior call
+    # (same tool name + identical args), we're stuck in a loop — terminate early.
+    if tool_calls:
+        seen = {
+            (c.get("name"), json.dumps(c.get("args") or {}, sort_keys=True))
+            for msg in state["messages"]
+            if isinstance(msg, AIMessage)
+            for c in (getattr(msg, "tool_calls", None) or [])
+        }
+        novel = [
+            c for c in tool_calls
+            if (c.get("name"), json.dumps(c.get("args") or {}, sort_keys=True)) not in seen
+        ]
+        if not novel:
+            fallback = "I appear to be stuck repeating the same tool calls. Stopping to avoid a loop."
+            return {
+                "messages": [resp],
+                "done": True,
+                "step": current_step,
+                "termination_reason": "repeated_tool_call",
+                "final_answer": fallback,
+            }
 
     # Any other tool calls go to tool_node for execution.
     if tool_calls:
