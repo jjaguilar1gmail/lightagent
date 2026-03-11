@@ -38,25 +38,12 @@ def _narrative(event: TraceEvent) -> Optional[str]:
 
     # ── node_start: the "what is happening right now" line ─────────────────
     if t == "node_start":
-        if n == "planner":
-            goal = (p.get("user_goal") or "")[:80]
-            suffix = f"  [dim]{goal}[/dim]" if goal else ""
-            return f"[yellow]◆  Planning next steps…[/yellow]{suffix}"
-
         if n == "agent":
-            step = p.get("step") or 0
-            plan: list = p.get("plan") or []
-            # step is pre-increment in the payload (incremented at start of fn)
             step_str = ""
-            if plan:
-                idx = min(step, len(plan) - 1)
-                step_str = f"  [dim]step {step + 1}/{len(plan)}: {plan[idx][:70]}[/dim]"
-            elif step is not None:
-                step_str = f"  [dim]step {step + 1}[/dim]"
+            step = p.get("step")
+            if step is not None:
+                step_str = f"  [dim]turn {step + 1}[/dim]"
             return f"[yellow]◆  Thinking…[/yellow]{step_str}"
-
-        if n == "reflect":
-            return "[yellow]◆  Checking whether we're done…[/yellow]"
 
         if n == "tools":
             return "[yellow]◆  Executing tools…[/yellow]"
@@ -67,12 +54,6 @@ def _narrative(event: TraceEvent) -> Optional[str]:
     if t == "node_end":
         elapsed = p.get("elapsed_ms")
         ms = f" {elapsed}ms" if elapsed else ""
-        if n == "planner":
-            pl = p.get("plan_len", 0)
-            return f"  [dim]└ plan ready: {pl} step(s){ms}[/dim]"
-        if n == "reflect":
-            done = p.get("done")
-            return f"  [dim]└ done={done}{ms}[/dim]"
         if n == "agent":
             return f"  [dim]└ agent responded{ms}[/dim]"
         return None  # silent for other node_end by default
@@ -163,7 +144,8 @@ class ConsoleSink:
                 return
 
             if t == "llm_call_end":
-                response = (p.get("response") or "").strip()
+                response = (p.get("response_text") or p.get("response") or "").strip()
+                tool_calls = p.get("tool_calls") or []
                 elapsed = p.get("elapsed_ms")
                 ms = f" [dim]{elapsed}ms[/dim]" if elapsed else ""
                 err = p.get("error")
@@ -171,7 +153,14 @@ class ConsoleSink:
                     self._print(f"[bold red]└─ LLM error:{ms} {str(err)[:200]}[/bold red]")
                 elif response:
                     self._print(f"[blue]│[/blue]  {response}")
+                    if tool_calls:
+                        names = ", ".join(str(call.get("name") or "?") for call in tool_calls)
+                        self._print(f"[blue]│[/blue]  [dim]tool_calls: {names}[/dim]")
                     self._print(f"[bold blue]└─ done[/bold blue]{ms}")
+                elif tool_calls:
+                    names = ", ".join(str(call.get("name") or "?") for call in tool_calls)
+                    self._print(f"[blue]│[/blue]  [dim]tool_calls: {names}[/dim]")
+                    self._print(f"[bold blue]└─ done[/bold blue]{ms}  [dim](tool call — no text)[/dim]")
                 else:
                     self._print(f"[bold blue]└─ done[/bold blue]{ms}  [dim](tool call — no text)[/dim]")
                 return
