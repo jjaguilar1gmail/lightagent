@@ -5,7 +5,9 @@ import sys
 from dotenv import load_dotenv
 
 from langchain_core.messages import HumanMessage
+from .evaluator import build_evaluator_input, evaluate_run
 from .graph import build_graph
+from .tools import ALL_TOOLS
 from .tracing import new_run, ConsoleSink, JSONLSink, SQLiteSink
 
 
@@ -40,8 +42,14 @@ def main():
         SQLiteSink(path="traces/traces.db"),
     ]
 
+    evaluation = None
     with new_run(sinks=sinks) as run:
         final = graph.invoke(init_state)
+        evaluator_input = build_evaluator_input(final, available_tools=[tool.name for tool in ALL_TOOLS])
+        try:
+            evaluation = evaluate_run(evaluator_input)
+        except Exception:
+            evaluation = None
 
     # Prefer the structured state field; fall back to scanning messages.
     final_answer_text = final.get("final_answer", "")
@@ -55,6 +63,23 @@ def main():
                 print("\n---\n")
                 print(m.content)
                 break
+
+    if evaluation is not None:
+        print("\n[evaluator]")
+        print(f"outcome: {evaluation.outcome}")
+        print(f"support: {evaluation.support_level}")
+        print(f"best next support: {evaluation.best_next_support}")
+        print(evaluation.reason)
+        if evaluation.suggested_clarification:
+            print(f"suggested clarification: {evaluation.suggested_clarification}")
+        if evaluation.helpful_tool_idea is not None:
+            print(
+                "helpful tool idea: "
+                f"{evaluation.helpful_tool_idea.name}"
+                f" ({evaluation.helpful_tool_idea.purpose})"
+            )
+        if evaluation.tool_gap_summary:
+            print(f"tool gap: {evaluation.tool_gap_summary}")
 
     print(f"\n[trace written to traces/{run.run_id}.jsonl and traces/traces.db]")
 
