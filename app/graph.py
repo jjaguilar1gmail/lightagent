@@ -11,7 +11,7 @@ from langgraph.graph.message import add_messages
 
 from .agent_policy import PolicyContext, evaluate_completion, tool_outcome_guidance
 from .prompts import BASE_SYSTEM_PROMPT
-from .tools import calc, final_answer, now_utc
+from .tools import ALL_TOOLS, FINAL_ANSWER_TOOL_NAME
 from .tracing import traced_node, traced_router, traced_tool
 import os
 
@@ -30,8 +30,12 @@ class AgentState(TypedDict, total=False):
 
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-TOOLS = [calc, now_utc, final_answer]
-TRACED_TOOLS = [traced_tool(t) for t in [calc, now_utc]]
+TOOLS = list(ALL_TOOLS)
+TRACED_TOOL_MAP = {
+    tool.name: traced_tool(tool)
+    for tool in TOOLS
+    if tool.name != FINAL_ANSWER_TOOL_NAME
+}
 
 model_name = "meta-llama/llama-3.3-70b-instruct"
 llm = ChatOpenAI(
@@ -107,7 +111,7 @@ def agent_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     tool_calls = getattr(resp, "tool_calls", None) or []
 
     for call in tool_calls:
-        if call.get("name") != "final_answer":
+        if call.get("name") != FINAL_ANSWER_TOOL_NAME:
             continue
 
         answer = str((call.get("args") or {}).get("answer", "")).strip()
@@ -195,14 +199,12 @@ def tool_node(state: AgentState) -> Dict[str, Any]:
         return {"messages": []}
 
     tool_messages: List[ToolMessage] = []
-    tool_map = {tool.name: tool for tool in TRACED_TOOLS}
-
     for call in getattr(last, "tool_calls", []) or []:
         name = call.get("name")
-        if name == "final_answer":
+        if name == FINAL_ANSWER_TOOL_NAME:
             continue
 
-        tool = tool_map.get(name)
+        tool = TRACED_TOOL_MAP.get(name)
         if tool is None:
             tool_messages.append(
                 ToolMessage(

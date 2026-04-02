@@ -6,6 +6,9 @@ from datetime import datetime, timezone
 from langchain_core.tools import tool
 
 
+FINAL_ANSWER_TOOL_NAME = "final_answer"
+
+
 def _normalize_calc_expression(expression: str) -> str:
     normalized = expression.strip()
     # LLMs often emit ^ for exponentiation even though Python uses **.
@@ -55,3 +58,6 @@ def final_answer(answer: str) -> str:
     """
     # Never executed: agent_node intercepts this call before tool_node runs.
     return answer
+
+
+ALL_TOOLS = (calc, now_utc, final_answer)
