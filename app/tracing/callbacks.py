@@ -34,6 +34,32 @@ class TracingCallbackHandler(BaseCallbackHandler):
             return text
         return text[: self.max_chars] + f"…[+{len(text) - self.max_chars} chars]"
 
+    def _clip_value(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return self._clip(value)
+        if isinstance(value, list):
+            return [self._clip_value(item) for item in value]
+        if isinstance(value, dict):
+            return {str(key): self._clip_value(item) for key, item in value.items()}
+        return value
+
+    def _serialize_tool_calls(self, generation: Any) -> List[Dict[str, Any]]:
+        message = getattr(generation, "message", None)
+        raw_tool_calls = getattr(message, "tool_calls", None) or []
+        tool_calls: List[Dict[str, Any]] = []
+        for call in raw_tool_calls:
+            if not isinstance(call, dict):
+                continue
+            tool_calls.append(
+                {
+                    "name": call.get("name"),
+                    "args": self._clip_value(call.get("args") or {}),
+                    "id": call.get("id"),
+                    "type": call.get("type"),
+                }
+            )
+        return tool_calls
+
     # ------------------------------------------------------------------
     # LLM events
     # ------------------------------------------------------------------
@@ -66,10 +92,12 @@ class TracingCallbackHandler(BaseCallbackHandler):
         elapsed = int((time.monotonic() - start) * 1000) if start is not None else None
 
         preview = ""
+        tool_calls: List[Dict[str, Any]] = []
         if response.generations:
             gen0 = response.generations[0]
             if gen0:
                 preview = getattr(gen0[0], "text", "") or ""
+                tool_calls = self._serialize_tool_calls(gen0[0])
 
         emit(
             "llm_call_end",
@@ -77,6 +105,8 @@ class TracingCallbackHandler(BaseCallbackHandler):
             payload={
                 "elapsed_ms": elapsed,
                 "response": self._clip(preview),
+                "response_text": self._clip(preview),
+                "tool_calls": tool_calls,
             },
         )
 

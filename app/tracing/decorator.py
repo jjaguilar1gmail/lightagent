@@ -15,15 +15,12 @@ def _state_snapshot(state: Any, result: Any = None) -> dict[str, Any]:
     base = dict(state or {}) if isinstance(state, dict) else {}
     if isinstance(result, dict):
         base.update(result)
-    plan = base.get("plan", [])
     return {
         "step": base.get("step"),
         "done": base.get("done"),
         "final_answer": (base.get("final_answer") or "")[:160],
         "termination_reason": (base.get("termination_reason") or "")[:120],
         "parse_errors": base.get("parse_errors"),
-        "plan": plan,
-        "plan_len": len(plan),
         "user_goal": (base.get("user_goal") or "")[:120],
     }
 

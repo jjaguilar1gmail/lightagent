@@ -6,6 +6,16 @@ from datetime import datetime, timezone
 from langchain_core.tools import tool
 
 
+FINAL_ANSWER_TOOL_NAME = "final_answer"
+
+
+def _normalize_calc_expression(expression: str) -> str:
+    normalized = expression.strip()
+    # LLMs often emit ^ for exponentiation even though Python uses **.
+    normalized = normalized.replace("^", "**")
+    return normalized
+
+
 @tool
 def calc(expression: str) -> str:
     """
@@ -25,8 +35,9 @@ def calc(expression: str) -> str:
         "pow": pow,
     }
     try:
+        normalized = _normalize_calc_expression(expression)
         # NOTE: still not perfectly safe for hostile input; good enough for a starter.
-        value = eval(expression, {"__builtins__": {}}, allowed)  # noqa: S307
+        value = eval(normalized, {"__builtins__": {}}, allowed)  # noqa: S307
         return str(value)
     except Exception as e:
         return f"ERROR: {type(e).__name__}: {e}"
@@ -47,3 +58,6 @@ def final_answer(answer: str) -> str:
     """
     # Never executed: agent_node intercepts this call before tool_node runs.
     return answer
+
+
+ALL_TOOLS = (calc, now_utc, final_answer)

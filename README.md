@@ -26,3 +26,11 @@ python -m venv venv
 ```bash
 pip install -r requirements.txt
 ```
+
+## Running Tests
+
+This repo now includes a small stdlib `unittest` suite for the graph control-flow invariants.
+
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
