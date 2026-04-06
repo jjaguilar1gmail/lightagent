@@ -81,6 +81,24 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(result.best_next_support, "none")
         self.assertEqual(len(stub_model.calls), 1)
 
+    def test_evaluate_run_parses_json_from_ai_message_with_fence(self) -> None:
+        final_state = {
+            "messages": [HumanMessage(content="What is 6 times 7?"), AIMessage(content="42")],
+            "final_answer": "42",
+            "termination_reason": "completed",
+        }
+        evaluator_input = build_evaluator_input(final_state, available_tools=["calc", "now_utc", "final_answer"])
+        stub_model = _StubEvaluatorModel(
+            AIMessage(
+                content='```json\n{\n  "answered": true,\n  "support_level": "sufficient",\n  "outcome": "answered_with_sufficient_support",\n  "best_next_support": "none",\n  "reason": "The answer resolves the question.",\n  "retry_with_existing_tools": false,\n  "missing_capability": false,\n  "suggested_clarification": null,\n  "helpful_tool_idea": null,\n  "tool_gap_summary": "No gap identified"\n}\n```'
+            )
+        )
+
+        result = evaluate_run(evaluator_input, model=stub_model)
+
+        self.assertTrue(result.answered)
+        self.assertEqual(result.outcome, "answered_with_sufficient_support")
+
     def test_evaluate_run_coerces_recommended_tool(self) -> None:
         final_state = {
             "messages": [HumanMessage(content="What is the weather in Seattle right now?"), AIMessage(content="I cannot tell.")],
@@ -100,6 +118,7 @@ class EvaluatorTests(unittest.TestCase):
                 "suggested_clarification": None,
                 "helpful_tool_idea": {
                     "name": "weather_lookup",
+                    "family": "api_lookup",
                     "purpose": "Fetch current weather conditions by location",
                     "inputs": ["location"],
                     "outputs": "current weather conditions with timestamp",
@@ -115,6 +134,7 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(result.best_next_support, "missing_tool")
         self.assertIsNotNone(result.helpful_tool_idea)
         self.assertEqual(result.helpful_tool_idea.name, "weather_lookup")
+        self.assertEqual(result.helpful_tool_idea.family, "api_lookup")
         self.assertEqual(result.helpful_tool_idea.inputs, ("location",))
 
     def test_evaluate_run_allows_helpful_tool_idea_even_when_existing_tools_are_best_next_step(self) -> None:
@@ -139,6 +159,7 @@ class EvaluatorTests(unittest.TestCase):
                 "suggested_clarification": "What jug size and marble diameter should I assume?",
                 "helpful_tool_idea": {
                     "name": "web_search",
+                    "family": "web_retrieval",
                     "purpose": "Look up typical milk jug volumes and marble diameters",
                     "inputs": ["query"],
                     "outputs": "ranked factual snippets with sources",
@@ -154,6 +175,8 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(result.suggested_clarification, "What jug size and marble diameter should I assume?")
         self.assertIsNotNone(result.helpful_tool_idea)
         self.assertEqual(result.helpful_tool_idea.name, "web_search")
+        self.assertEqual(result.helpful_tool_idea.family, "web_retrieval")
+
 
 
 if __name__ == "__main__":

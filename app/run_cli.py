@@ -76,6 +76,7 @@ def main():
             print(
                 "helpful tool idea: "
                 f"{evaluation.helpful_tool_idea.name}"
+                f" [{evaluation.helpful_tool_idea.family}]"
                 f" ({evaluation.helpful_tool_idea.purpose})"
             )
         if evaluation.tool_gap_summary:

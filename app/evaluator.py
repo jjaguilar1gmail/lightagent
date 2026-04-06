@@ -11,6 +11,7 @@ from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemM
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from .structured_output import schema_instruction, validate_structured_output
 from .tracing import emit
 
 load_dotenv()
@@ -29,6 +30,21 @@ BestNextSupport = Literal[
     "user_clarification",
     "missing_tool",
     "no_reasonable_support_path",
+]
+ToolFamily = Literal[
+    "none",
+    "math",
+    "time",
+    "web_retrieval",
+    "document_retrieval",
+    "tabular_analysis",
+    "file_io",
+    "api_lookup",
+    "shopping_lookup",
+    "geospatial_lookup",
+    "simulation",
+    "user_clarification",
+    "other",
 ]
 
 
@@ -54,6 +70,7 @@ class EvaluatorInput:
 @dataclass(frozen=True)
 class RecommendedTool:
     name: str
+    family: ToolFamily
     purpose: str
     inputs: tuple[str, ...]
     outputs: str
@@ -81,6 +98,7 @@ class EvaluatorResult:
 
 class _RecommendedToolModel(BaseModel):
     name: str = Field(min_length=1)
+    family: ToolFamily
     purpose: str = Field(min_length=1)
     inputs: list[str] = Field(default_factory=list)
     outputs: str = Field(min_length=1)
@@ -212,6 +230,7 @@ def _build_prompt_messages(run_input: EvaluatorInput) -> list[AnyMessage]:
         HumanMessage(
             content=(
                 "Return a structured evaluation for this completed run.\n\n"
+                f"{schema_instruction(_EvaluatorOutputModel)}\n\n"
                 "Rules:\n"
                 "- If the answer is materially responsive and adequately supported, choose answered_with_sufficient_support.\n"
                 "- If the answer is weak but an existing tool could plausibly have closed the gap, choose not_answered_but_existing_tool_should_have_been_used.\n"
@@ -221,7 +240,8 @@ def _build_prompt_messages(run_input: EvaluatorInput) -> list[AnyMessage]:
                 "- Set best_next_support to one of: none, existing_tools, user_clarification, missing_tool, no_reasonable_support_path.\n"
                 "- For Fermi or rough-estimate questions, prefer existing_tools or user_clarification over ambiguous.\n"
                 "- suggested_clarification should be a concrete follow-up question only when clarification would materially help.\n"
-                "- helpful_tool_idea may be provided whenever a realistic external capability would have materially improved the result, even if existing_tools is still the best immediate next step.\n\n"
+                "- helpful_tool_idea may be provided whenever a realistic external capability would have materially improved the result, even if existing_tools is still the best immediate next step.\n"
+                "- helpful_tool_idea.family must be a broad family label such as web_retrieval, api_lookup, tabular_analysis, shopping_lookup, geospatial_lookup, document_retrieval, simulation, math, time, or other.\n\n"
                 f"Run summary:\n{summary}"
             )
         ),
@@ -235,15 +255,16 @@ def _default_structured_model() -> Any:
         temperature=0,
         api_key=api_key,
         base_url="https://openrouter.ai/api/v1",
-    ).with_structured_output(_EvaluatorOutputModel)
+    )
 
 
 def _coerce_result(raw: Any) -> EvaluatorResult:
-    parsed = raw if isinstance(raw, _EvaluatorOutputModel) else _EvaluatorOutputModel.model_validate(raw)
+    parsed = validate_structured_output(raw, _EvaluatorOutputModel)
     helpful_tool_idea = None
     if parsed.helpful_tool_idea is not None:
         helpful_tool_idea = RecommendedTool(
             name=parsed.helpful_tool_idea.name,
+            family=parsed.helpful_tool_idea.family,
             purpose=parsed.helpful_tool_idea.purpose,
             inputs=tuple(parsed.helpful_tool_idea.inputs),
             outputs=parsed.helpful_tool_idea.outputs,

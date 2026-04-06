@@ -1,0 +1,882 @@
+[
+  {
+    "id": "knowledge_001",
+    "question": "Explain in simple terms why the sky appears blue.",
+    "tags": ["knowledge", "explanation"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should directly explain Rayleigh scattering in plain language without needing tools."
+  },
+  {
+    "id": "knowledge_002",
+    "question": "What is the difference between TCP and UDP?",
+    "tags": ["knowledge", "technology"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should compare connection-oriented reliability versus speed and simplicity."
+  },
+  {
+    "id": "knowledge_003",
+    "question": "Explain opportunity cost with a simple everyday example.",
+    "tags": ["knowledge", "explanation", "economics"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should define opportunity cost and illustrate it with a relatable tradeoff."
+  },
+  {
+    "id": "knowledge_004",
+    "question": "Why do databases use indexes?",
+    "tags": ["knowledge", "technology"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should describe faster lookup tradeoffs and mention storage or write overhead."
+  },
+  {
+    "id": "knowledge_005",
+    "question": "What is recursion in programming, in one short paragraph?",
+    "tags": ["knowledge", "technology", "explanation"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should explain a function calling itself and mention a base case."
+  },
+  {
+    "id": "knowledge_006",
+    "question": "Give two pros and two cons of remote work for a small software team.",
+    "tags": ["knowledge", "advice", "work"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should provide a balanced concise list of benefits and drawbacks."
+  },
+  {
+    "id": "calc_001",
+    "question": "What is a 17% tip on a $43.50 bill?",
+    "tags": ["math", "calculation"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should compute the tip correctly and optionally include the total."
+  },
+  {
+    "id": "calc_002",
+    "question": "If a server handles 250 requests per second, how many requests is that in one hour?",
+    "tags": ["math", "calculation", "technology"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should multiply correctly and state the hourly total."
+  },
+  {
+    "id": "calc_003",
+    "question": "Starting at 500 MB, what size do I get after 4 weeks of 12% weekly growth?",
+    "tags": ["math", "calculation", "growth"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should use compound growth rather than simple linear addition."
+  },
+  {
+    "id": "calc_004",
+    "question": "How many minutes are in 3 days and 4 hours?",
+    "tags": ["math", "calculation"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should convert the full duration into minutes correctly."
+  },
+  {
+    "id": "time_001",
+    "question": "What time is it in UTC right now?",
+    "tags": ["time", "current_info"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "time",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should use the current UTC timestamp rather than guessing."
+  },
+  {
+    "id": "calc_005",
+    "question": "At $0.16 per kWh, how much does it cost to run a 100W bulb continuously for 30 days?",
+    "tags": ["math", "calculation", "estimation"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should convert watts to kilowatts, multiply by hours, and estimate total cost."
+  },
+  {
+    "id": "estimate_001",
+    "question": "How many marbles fit inside a milk jug?",
+    "tags": ["estimation", "fermi", "physical"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should make explicit assumptions about jug volume and marble size, then give a rough estimate instead of refusing."
+  },
+  {
+    "id": "estimate_002",
+    "question": "Roughly how many piano tuners are there in Chicago?",
+    "tags": ["estimation", "fermi", "business"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should do a classic Fermi estimate with transparent assumptions rather than saying the question cannot be answered."
+  },
+  {
+    "id": "estimate_003",
+    "question": "If I want to paint a 12 by 14 room with 8-foot ceilings, about how much wall paint do I need?",
+    "tags": ["estimation", "calculation", "home"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should estimate wall area, mention assumptions like doors and windows, and provide a practical ballpark amount."
+  },
+  {
+    "id": "estimate_004",
+    "question": "About how many tennis balls fit in a standard school bus?",
+    "tags": ["estimation", "fermi", "physical"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should state assumptions and provide an order-of-magnitude estimate."
+  },
+  {
+    "id": "estimate_005",
+    "question": "Roughly how many pages can fit in a standard banker box?",
+    "tags": ["estimation", "fermi", "office"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should estimate box volume or stack dimensions and give a reasonable ballpark count."
+  },
+  {
+    "id": "estimate_006",
+    "question": "How many bricks would I need for a simple 10-foot by 10-foot patio?",
+    "tags": ["estimation", "calculation", "home"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should assume a brick size, estimate area, include waste, and provide a rough count."
+  },
+  {
+    "id": "clarify_001",
+    "question": "Is this budget enough for my trip?",
+    "tags": ["clarification", "travel", "advice"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask for destination, duration, budget amount, and spending style before judging sufficiency."
+  },
+  {
+    "id": "clarify_002",
+    "question": "Which laptop should I buy?",
+    "tags": ["clarification", "shopping", "advice"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": "shopping_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask about budget, operating system, portability, and workload before recommending anything."
+  },
+  {
+    "id": "clarify_003",
+    "question": "Should I buy the cheaper used car?",
+    "tags": ["clarification", "advice", "shopping"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask about price difference, mileage, maintenance history, and risk tolerance."
+  },
+  {
+    "id": "clarify_004",
+    "question": "Can I finish this project by Friday?",
+    "tags": ["clarification", "planning", "work"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask about current status, scope, dependencies, and available hours before answering."
+  },
+  {
+    "id": "clarify_005",
+    "question": "Which apartment is better for me?",
+    "tags": ["clarification", "housing", "advice"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask what options exist and what tradeoffs matter most to the user."
+  },
+  {
+    "id": "clarify_006",
+    "question": "Is this meal plan healthy?",
+    "tags": ["clarification", "health", "advice"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask for the actual meal plan and relevant dietary goals or restrictions."
+  },
+  {
+    "id": "missing_001",
+    "question": "What is the current weather in Seattle?",
+    "tags": ["missing_tool", "current_info", "weather"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "api_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should recognize that live weather retrieval is missing; a plain answer should not confidently guess."
+  },
+  {
+    "id": "missing_002",
+    "question": "Summarize the latest major news about SpaceX Starship.",
+    "tags": ["missing_tool", "current_info", "news"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should point to live web retrieval instead of inventing up-to-date news."
+  },
+  {
+    "id": "missing_003",
+    "question": "Compare three current 30-year mortgage rates from major lenders.",
+    "tags": ["missing_tool", "current_info", "finance"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should recognize the need for current retrieval and comparison of lender data."
+  },
+  {
+    "id": "missing_004",
+    "question": "Find average rent for a two-bedroom apartment in Austin right now.",
+    "tags": ["missing_tool", "current_info", "housing"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify current market lookup as the missing capability."
+  },
+  {
+    "id": "missing_005",
+    "question": "Find three highly rated trail running shoes under $140 and compare them.",
+    "tags": ["missing_tool", "shopping", "comparison"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "shopping_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should suggest product lookup or shopping retrieval rather than free-associating old model knowledge."
+  },
+  {
+    "id": "missing_006",
+    "question": "What is the driving distance from Boston to Philadelphia?",
+    "tags": ["missing_tool", "maps", "travel"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "geospatial_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should call out map or routing lookup rather than claiming a precise current route distance."
+  },
+  {
+    "id": "missing_007",
+    "question": "I have a local CSV of expenses. Tell me the top three categories by spend.",
+    "tags": ["missing_tool", "data", "file"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "tabular_analysis",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify missing file or tabular-analysis capability rather than pretending to have read the CSV."
+  },
+  {
+    "id": "missing_008",
+    "question": "Search my project docs and tell me how OAuth token refresh works in this codebase.",
+    "tags": ["missing_tool", "documents", "code"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "document_retrieval",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify document or code retrieval as the missing capability."
+  },
+  {
+    "id": "missing_009",
+    "question": "Call the GitHub API and tell me how many open issues the numpy repo has right now.",
+    "tags": ["missing_tool", "api", "current_info"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "api_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should point to API access or web retrieval instead of guessing live repository state."
+  },
+  {
+    "id": "missing_010",
+    "question": "Simulate 10,000 coin flips and tell me how often I get at least 7 heads in 10 flips.",
+    "tags": ["missing_tool", "simulation", "probability"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "simulation",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should notice that a lightweight simulation or code-execution tool would help, even though an analytic approximation could also be discussed."
+  },
+  {
+    "id": "deadend_001",
+    "question": "What number am I thinking of right now?",
+    "tags": ["dead_end", "impossible"],
+    "expected_best_next_support": "no_reasonable_support_path",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good answer should acknowledge there is no reasonable way to know."
+  },
+  {
+    "id": "deadend_002",
+    "question": "Tell me the exact contents of the sealed envelope on my desk.",
+    "tags": ["dead_end", "impossible"],
+    "expected_best_next_support": "no_reasonable_support_path",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good answer should say it cannot know without access, not hallucinate."
+  },
+  {
+    "id": "deadend_003",
+    "question": "Will I definitely meet my soulmate next year?",
+    "tags": ["dead_end", "prediction", "subjective"],
+    "expected_best_next_support": "no_reasonable_support_path",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good answer should avoid false certainty and treat this as not reasonably answerable."
+  },
+  {
+    "id": "deadend_004",
+    "question": "Which political ideology is objectively the one true correct answer for everyone?",
+    "tags": ["dead_end", "subjective", "philosophy"],
+    "expected_best_next_support": "no_reasonable_support_path",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good answer should avoid claiming a single objective truth in a deeply normative question."
+  },
+  {
+    "id": "knowledge_007",
+    "question": "Explain the difference between a manager and an individual contributor career path.",
+    "tags": ["knowledge", "work", "career"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should compare responsibilities, leverage, and tradeoffs without pretending one is universally better."
+  },
+  {
+    "id": "knowledge_008",
+    "question": "What is the difference between an SDK and an API?",
+    "tags": ["knowledge", "technology"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should distinguish an interface from a broader toolkit."
+  },
+  {
+    "id": "knowledge_009",
+    "question": "Why do people use budgeting categories instead of one big spending bucket?",
+    "tags": ["knowledge", "finance", "explanation"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should explain visibility, tradeoffs, and control of spending decisions."
+  },
+  {
+    "id": "knowledge_010",
+    "question": "Explain the concept of technical debt to a non-engineer.",
+    "tags": ["knowledge", "technology", "explanation"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should make the metaphor clear and explain speed-now cost-later tradeoffs."
+  },
+  {
+    "id": "knowledge_011",
+    "question": "What is a supply chain bottleneck in simple terms?",
+    "tags": ["knowledge", "business", "explanation"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should describe the slowest stage limiting overall throughput."
+  },
+  {
+    "id": "knowledge_012",
+    "question": "Why might a team choose a monolith instead of microservices?",
+    "tags": ["knowledge", "technology", "architecture"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should mention simplicity, operational overhead, and scale tradeoffs."
+  },
+  {
+    "id": "calc_006",
+    "question": "What is 18% off a $79 item before tax?",
+    "tags": ["math", "calculation", "shopping"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should calculate the discount and resulting price correctly."
+  },
+  {
+    "id": "calc_007",
+    "question": "If I save $250 per month, how much will I save in 18 months?",
+    "tags": ["math", "calculation", "finance"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should multiply accurately and state the result plainly."
+  },
+  {
+    "id": "calc_008",
+    "question": "How many gallons per minute is 900 gallons over 2 hours?",
+    "tags": ["math", "calculation", "units"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should convert hours to minutes and compute gallons per minute."
+  },
+  {
+    "id": "calc_009",
+    "question": "What is the monthly payment if I split $2,400 evenly across 9 months?",
+    "tags": ["math", "calculation", "finance"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should divide evenly and state the recurring monthly amount."
+  },
+  {
+    "id": "calc_010",
+    "question": "If a file grows from 80 GB to 116 GB, what percent increase is that?",
+    "tags": ["math", "calculation", "technology"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should compute percent increase correctly, not just the absolute change."
+  },
+  {
+    "id": "calc_011",
+    "question": "How many seconds are there in 2 weeks?",
+    "tags": ["math", "calculation", "time"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should convert weeks to seconds accurately."
+  },
+  {
+    "id": "calc_012",
+    "question": "At 3.2 miles per hour, how far do I walk in 45 minutes?",
+    "tags": ["math", "calculation", "units"],
+    "expected_best_next_support": "none",
+    "expected_outcome": "answered_with_sufficient_support",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should convert 45 minutes to hours and compute distance."
+  },
+  {
+    "id": "estimate_007",
+    "question": "Roughly how many coffee beans are in a one-pound bag?",
+    "tags": ["estimation", "fermi", "food"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should make rough assumptions about bean mass and estimate instead of refusing."
+  },
+  {
+    "id": "estimate_008",
+    "question": "How many pizzas would I need for 45 adults at a casual office event?",
+    "tags": ["estimation", "planning", "food"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should assume slices per person and convert that into a rough pizza count with buffer."
+  },
+  {
+    "id": "estimate_009",
+    "question": "About how many books fit on a 6-foot bookshelf?",
+    "tags": ["estimation", "fermi", "home"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should assume average book thickness and estimate a count."
+  },
+  {
+    "id": "estimate_010",
+    "question": "How many solar panels might I need to offset 900 kWh per month?",
+    "tags": ["estimation", "energy", "planning"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should state rough assumptions about panel output and produce a ballpark range."
+  },
+  {
+    "id": "estimate_011",
+    "question": "Roughly how much mulch do I need for a 20 by 30 foot garden bed at 3 inches deep?",
+    "tags": ["estimation", "calculation", "home"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should calculate cubic feet or cubic yards and give a practical estimate."
+  },
+  {
+    "id": "estimate_012",
+    "question": "How many parking spaces fit on one acre of land?",
+    "tags": ["estimation", "fermi", "planning"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should use rough area assumptions and give an order-of-magnitude answer."
+  },
+  {
+    "id": "estimate_013",
+    "question": "About how much water does a family of four use in a month?",
+    "tags": ["estimation", "household", "utilities"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should state a rough per-person daily assumption and estimate a monthly total."
+  },
+  {
+    "id": "estimate_014",
+    "question": "How many dumpsters would it take to clear out a typical 2,000-square-foot house?",
+    "tags": ["estimation", "home", "planning"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should provide a rough range with explicit assumptions rather than refusing."
+  },
+  {
+    "id": "estimate_015",
+    "question": "Roughly how many emails can a support rep answer in an 8-hour day?",
+    "tags": ["estimation", "work", "operations"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should choose a reasonable handling-time assumption and turn it into a rough throughput estimate."
+  },
+  {
+    "id": "estimate_016",
+    "question": "How much storage would 2 million plain-text log lines take roughly?",
+    "tags": ["estimation", "technology", "calculation"],
+    "expected_best_next_support": "existing_tools",
+    "expected_outcome": "not_answered_but_existing_tool_should_have_been_used",
+    "expected_helpful_tool_family": "math",
+    "current_tools_sufficient": true,
+    "answer_expectation": "A good answer should assume average bytes per line and give a rough storage estimate."
+  },
+  {
+    "id": "clarify_007",
+    "question": "Is this exercise routine enough?",
+    "tags": ["clarification", "health", "fitness"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask what the routine is and what goal 'enough' refers to."
+  },
+  {
+    "id": "clarify_008",
+    "question": "Which city should I move to?",
+    "tags": ["clarification", "life", "advice"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask about budget, work, climate, lifestyle, and constraints before recommending cities."
+  },
+  {
+    "id": "clarify_009",
+    "question": "Should I refinance my mortgage?",
+    "tags": ["clarification", "finance", "advice"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask for current rate, new rate, closing costs, and time horizon."
+  },
+  {
+    "id": "clarify_010",
+    "question": "Is this a good pricing model for my product?",
+    "tags": ["clarification", "business", "pricing"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask about product, customer type, usage pattern, and competitive context."
+  },
+  {
+    "id": "clarify_011",
+    "question": "Should I take this job offer?",
+    "tags": ["clarification", "career", "advice"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask about compensation, growth, commute, role fit, and alternatives."
+  },
+  {
+    "id": "clarify_012",
+    "question": "Is my website conversion rate good?",
+    "tags": ["clarification", "business", "metrics"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask what the rate is, what kind of site it is, and what benchmark or goal matters."
+  },
+  {
+    "id": "clarify_013",
+    "question": "Should I spend more on ads this month?",
+    "tags": ["clarification", "marketing", "advice"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": "tabular_analysis",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask about CAC, ROAS, budget constraints, and current performance trends."
+  },
+  {
+    "id": "clarify_014",
+    "question": "Is this apartment too expensive for me?",
+    "tags": ["clarification", "housing", "finance"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask about income, other obligations, and risk tolerance."
+  },
+  {
+    "id": "clarify_015",
+    "question": "Is my churn rate a problem?",
+    "tags": ["clarification", "business", "saas"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": "tabular_analysis",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask what the churn rate is, what segment it refers to, and what time window or benchmark matters."
+  },
+  {
+    "id": "clarify_016",
+    "question": "Should I upgrade my PC?",
+    "tags": ["clarification", "technology", "shopping"],
+    "expected_best_next_support": "user_clarification",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": "shopping_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good response should ask what the current PC is, what workloads matter, and what budget exists."
+  },
+  {
+    "id": "missing_011",
+    "question": "Read the PDF I uploaded and summarize the five biggest risks in it.",
+    "tags": ["missing_tool", "documents", "file"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "document_retrieval",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify missing file or document-reading capability."
+  },
+  {
+    "id": "missing_012",
+    "question": "Open this spreadsheet and tell me which month had the highest revenue.",
+    "tags": ["missing_tool", "data", "file"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "tabular_analysis",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should call out missing spreadsheet or tabular-analysis capability."
+  },
+  {
+    "id": "missing_013",
+    "question": "Look at my local log files and tell me what the top recurring error is.",
+    "tags": ["missing_tool", "file", "operations"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "file_io",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify file access and log analysis as missing capabilities."
+  },
+  {
+    "id": "missing_014",
+    "question": "Get me today's EUR to USD exchange rate.",
+    "tags": ["missing_tool", "current_info", "finance"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "api_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should suggest live financial data retrieval, not a guessed exchange rate."
+  },
+  {
+    "id": "missing_015",
+    "question": "Compare current gas prices near downtown Denver.",
+    "tags": ["missing_tool", "maps", "current_info"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "geospatial_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify local map or place lookup as the missing capability."
+  },
+  {
+    "id": "missing_016",
+    "question": "Find the cheapest nonstop flight from Chicago to Seattle next month.",
+    "tags": ["missing_tool", "travel", "shopping"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "shopping_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should point to travel or shopping retrieval rather than inventing prices."
+  },
+  {
+    "id": "missing_017",
+    "question": "Analyze this JSON API payload and tell me which field is most often null.",
+    "tags": ["missing_tool", "data", "api"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "tabular_analysis",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify missing data inspection capability."
+  },
+  {
+    "id": "missing_018",
+    "question": "Search recent SEC filings and summarize the biggest risk factors for Nvidia.",
+    "tags": ["missing_tool", "documents", "finance"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "document_retrieval",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should suggest document retrieval or web retrieval for current filings."
+  },
+  {
+    "id": "missing_019",
+    "question": "Use Zillow or similar data to estimate the median home price in Boise right now.",
+    "tags": ["missing_tool", "housing", "current_info"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "web_retrieval",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify live housing-market retrieval as the missing capability."
+  },
+  {
+    "id": "missing_020",
+    "question": "Read this local markdown notes folder and tell me the themes that recur most often.",
+    "tags": ["missing_tool", "documents", "file"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "file_io",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify local file access and text analysis as missing capabilities."
+  },
+  {
+    "id": "missing_021",
+    "question": "Given this Postgres dump, what tables are the largest?",
+    "tags": ["missing_tool", "data", "database"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "file_io",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should point to dump inspection or database tooling instead of pretending to know schema contents."
+  },
+  {
+    "id": "missing_022",
+    "question": "What restaurants within a 15-minute walk of Pike Place Market are open right now?",
+    "tags": ["missing_tool", "maps", "current_info"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "geospatial_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify maps or place lookup as the missing capability."
+  },
+  {
+    "id": "missing_023",
+    "question": "Pull the latest top posts from Hacker News and summarize the themes.",
+    "tags": ["missing_tool", "current_info", "news"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "api_lookup",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify API or web retrieval instead of fabricating a live feed summary."
+  },
+  {
+    "id": "missing_024",
+    "question": "Run a quick Monte Carlo simulation of this retirement portfolio for 30 years.",
+    "tags": ["missing_tool", "simulation", "finance"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "simulation",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify simulation or code execution as the missing capability."
+  },
+  {
+    "id": "missing_025",
+    "question": "Check my repo and tell me which tests are failing right now.",
+    "tags": ["missing_tool", "code", "file"],
+    "expected_best_next_support": "missing_tool",
+    "expected_outcome": "not_answered_because_missing_tool_capability",
+    "expected_helpful_tool_family": "file_io",
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good diagnosis should identify missing repo inspection or test-execution capability."
+  },
+  {
+    "id": "deadend_005",
+    "question": "Tell me the exact date I will die.",
+    "tags": ["dead_end", "prediction", "impossible"],
+    "expected_best_next_support": "no_reasonable_support_path",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good answer should avoid claiming impossible predictive certainty."
+  },
+  {
+    "id": "deadend_006",
+    "question": "What private memory am I remembering from childhood right now?",
+    "tags": ["dead_end", "impossible", "private_state"],
+    "expected_best_next_support": "no_reasonable_support_path",
+    "expected_outcome": "not_answered_due_to_ambiguous_or_unanswerable_request",
+    "expected_helpful_tool_family": null,
+    "current_tools_sufficient": false,
+    "answer_expectation": "A good answer should recognize there is no reasonable support path to know another person's private mental state."
+  }
+]
